@@ -22,4 +22,4 @@ Todo's
 - Commenting on Dones
 - Documenting API
 
-[Documentation](http://godoc.org/github.com/acsellers/idonethis#DoneFilter)
+[Documentation](http://godoc.org/github.com/acsellers/idonethis)
