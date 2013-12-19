@@ -137,3 +137,10 @@ type newDone struct {
 	Text      string `json:"text"`
 	User      User   `json:"user"`
 }
+
+type likeDone struct {
+	Action    string `json:"action"`
+	DoneId    int    `json:"done_id"`
+	ShortName string `json:"short_name"`
+	Username  string `json:"username"`
+}

@@ -226,6 +226,24 @@ func (c *Client) PostDone(text string) (Done, error) {
 	return d, nil
 }
 
+func (c *Client) LikeDone(d Done) error {
+	a := likeDone{
+		Action:    "like",
+		DoneId:    d.Id,
+		ShortName: c.TeamName,
+		Username:  c.UserName,
+	}
+
+	body, err := json.Marshal(a)
+	if err != nil {
+		return err
+	}
+
+	lu := fmt.Sprintf("feedback/done/%s/%d/", c.UserName, d.Id)
+	_, err = c.postJson(lu, body)
+	return err
+}
+
 func (c *Client) teamUrl() string {
 	return fmt.Sprintf("https://idonethis.com/api/v3/team/%s/", c.TeamName)
 }
