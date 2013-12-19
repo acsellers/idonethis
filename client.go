@@ -1,6 +1,7 @@
 package idonethis
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -78,7 +79,7 @@ func NewClient(username, password string) (*Client, error) {
 	} else {
 		rt := regexp.MustCompile("/cal/(.*)/\\\" title")
 		results = rt.FindSubmatch(secondPage)
-		if len(results) == 2 {
+		if len(results) >= 2 {
 			c.TeamName = string(results[1])
 		}
 	}
@@ -192,6 +193,39 @@ func (c *Client) Tags() ([]Tag, error) {
 	return t, nil
 }
 
+func (c *Client) PostDone(text string) (Done, error) {
+	current, err := c.CurrentUser()
+	if err != nil {
+		return Done{}, err
+	}
+	nd := newDone{
+		Calendar:  c.TeamName,
+		DoneDate:  time.Now().Format(ymd),
+		Owner:     current.Email,
+		ShortName: c.TeamName,
+		Text:      text,
+		User:      current,
+	}
+	body, err := json.Marshal(nd)
+	if err != nil {
+		return Done{}, err
+	}
+
+	result, err := c.postJson("dones/", body)
+	if err != nil {
+		return Done{}, err
+	}
+
+	var d Done
+	err = json.Unmarshal(result, &d)
+	if err != nil {
+		fmt.Println(string(result))
+		return Done{}, err
+	}
+
+	return d, nil
+}
+
 func (c *Client) teamUrl() string {
 	return fmt.Sprintf("https://idonethis.com/api/v3/team/%s/", c.TeamName)
 }
@@ -210,124 +244,50 @@ func (c *Client) getJson(page string) ([]byte, error) {
 	return body, nil
 }
 
-type User struct {
-	Id            int `json:"id"`
-	TeamProfileId int `json:"team_profile_id"`
+func (c *Client) postJson(page string, body []byte) ([]byte, error) {
+	req, err := http.NewRequest("POST", c.teamUrl()+page, bytes.NewReader(body))
+	if err != nil {
+		return []byte{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Referer", c.teamUrl())
+	token, err := c.getCSRF()
+	if err != nil {
+		return []byte{}, err
+	}
+	req.Header.Set("X-CSRFToken", token)
 
-	Username   string `json:"username"`
-	FirstName  string `json:"first_name"`
-	LastName   string `json:"last_name"`
-	NicestName string `json:"nicest_name"`
-
-	HasJoined bool `json:"has_joined"`
-	IsStaff   bool `json:"is_staff"`
-	IsAdmin   bool `json:"is_admin"`
-
-	Email           string   `json:"email"`
-	AvatarUrl       string   `json:"avatar_url"`
-	AlternateEmails []string `json:"alternate_emails"`
-}
-
-// Follower and followee strings are the Usernames of the follower and followee
-type Follow struct {
-	Id       int    `json:"id"`
-	Follower string `json:"follower"`
-	Followee string `json:"followee"`
-}
-
-type Team struct {
-	Name        string `json:"name"`
-	ShortName   string `json:"short_name"`
-	Active      bool   `json:"active"`
-	MemberCount int    `json:"member_count"`
-	Question    string `json:"question"`
-	/*
-	  Unmarshaled fields
-
-	  "fixed_discount"
-	  "is_free_forever"
-	  "monthly_price_per_user"
-	  "total_discount"
-	  "referrer_reward"
-	  "cc_last4"
-	  "referral_code"
-	  "trial_expiration_date"
-	  "coupon_code"
-	  "referred_reward"
-	  "has_discount"
-	  "is_paying"
-	  "on_trial"
-	  "percent_discount"
-	  "monthly_charge"
-	  "cancellation_requested"
-	*/
-
-}
-
-type Tag struct {
-	Id      int    `json:"id"`
-	Name    string `json:"name"`
-	DoneIds []int  `json:"done_ids"`
-}
-
-type Done struct {
-	Id            int    `json:"id"`
-	TeamShortName string `json:"team_short_name"`
-	DoneDate      string `json:"done_date"`
-	Owner         string `json:"owner"`
-
-	Text         string `json:"text"`
-	MarkedupText string `json:"markedup_text"`
-
-	Tags     []Tag  `json:"tags"`
-	Comments []Done `json:"comments"`
-	Likes    []Like `json:"likes"`
-
-	/*
-	  Unknown attributes
-
-	  "origin": null
-	  "rawintegrationdata": {}
-	*/
-}
-
-type Like struct {
-	Email string `json:"user"`
-}
-
-type DoneFilter struct {
-	Tags       []string
-	Start, End time.Time
-	Page       int
-	PerPage    int
-}
-
-func (df DoneFilter) String() string {
-	vals := url.Values{}
-
-	if len(df.Tags) > 0 {
-		vals.Add("tags", strings.Join(df.Tags, ","))
+	resp, err := c.session.Do(req)
+	if err != nil {
+		return []byte{}, err
 	}
 
-	if df.Page != 0 {
-		vals.Add("page", fmt.Sprint(df.Page))
+	result, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return []byte{}, err
 	}
 
-	if df.PerPage != 0 {
-		vals.Add("per_page", fmt.Sprint(df.Page))
+	return result, nil
+}
+
+func (c *Client) getCSRF() (string, error) {
+	// load the login page to get a csrf token for the login page
+	homeUrl := fmt.Sprintf("https://idonethis.com/cal/%s/", c.TeamName)
+	home, err := c.session.Get(homeUrl)
+	if err != nil {
+		return "", err
 	}
 
-	if !df.Start.IsZero() {
-		vals.Add("start", df.Start.Format(ymd))
-	}
-	if !df.End.IsZero() {
-		vals.Add("end", df.End.Format(ymd))
-	}
-	vs := vals.Encode()
-
-	if vs != "" {
-		return "?" + vals.Encode()
+	homePage, err := ioutil.ReadAll(home.Body)
+	if err != nil {
+		return "", err
 	}
 
-	return ""
+	r := regexp.MustCompile(`name='csrfmiddlewaretoken' value='(.*)' `)
+	results := r.FindSubmatch(homePage)
+	if len(results) >= 2 {
+		return string(results[1]), nil
+	}
+
+	return "", fmt.Errorf("Could not retrieve csrf token")
 }
