@@ -19,6 +19,6 @@ Todo's
 - Examples of origin field on dones
 - Examples of rawintegrationdata on dones
 - Date parser for the Done struct
-- Liking Dones
 - Commenting on Dones
+- Documenting API
 
