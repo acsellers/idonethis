@@ -1,0 +1,16 @@
+Notifiers are like desktop applications for iDoneThis
+
+A Notifier needs a login window, a taskbar icon/indicator,
+a little window to post new dones, a window that lists dones,
+and a way to show notifications of new dones from team members.
+It would also be nice to have a settings window, where you
+could set how often new dones are checked, team members who get
+checked, etc.
+
+Current notifiers:
+
+Ubuntu [Nofications, Login, Saved Passwords]
+
+OSX []
+
+Windows []
