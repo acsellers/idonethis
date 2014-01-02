@@ -40,7 +40,7 @@ func getBuilder() *gtk.Builder {
 		panic(err)
 	}
 
-	err = b.AddFromFile("/home/andrew/login.glade")
+	err = b.AddFromFile("/opt/idonethis/idt.glade")
 	if err != nil {
 		panic(err)
 	}
