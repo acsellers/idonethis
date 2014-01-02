@@ -7,19 +7,23 @@ import (
 	"github.com/conformal/gotk3/gtk"
 )
 
+var Builder *gtk.Builder
+
 type LoginWindow struct {
-	Builder   *gtk.Builder
 	Window    *gtk.Window
 	CancelBtn chan bool
 	LoginBtn  chan bool
 }
 
+func init() {
+	Builder = getBuilder()
+}
 func NewLoginWindow() *LoginWindow {
-	lw := &LoginWindow{Builder: getBuilder()}
+	lw := &LoginWindow{}
 	lw.CancelBtn = make(chan bool)
 	lw.LoginBtn = make(chan bool)
 
-	lw.Window = setupWindow(lw.Builder)
+	lw.Window = setupWindow(Builder)
 	lw.connectSignals()
 	return lw
 }
@@ -59,7 +63,7 @@ func setupWindow(b *gtk.Builder) *gtk.Window {
 }
 
 func (lw *LoginWindow) connectSignals() {
-	co, err := lw.Builder.GetObject("cancel_button")
+	co, err := Builder.GetObject("cancel_button")
 	if err != nil {
 		panic(err)
 	}
@@ -74,7 +78,7 @@ func (lw *LoginWindow) connectSignals() {
 		})
 	}
 
-	lo, err := lw.Builder.GetObject("login_button")
+	lo, err := Builder.GetObject("login_button")
 	if err != nil {
 		panic(err)
 	}
@@ -103,7 +107,7 @@ func (lw *LoginWindow) connectSignals() {
 }
 
 func (lw *LoginWindow) SetUsername(username string) {
-	uo, err := lw.Builder.GetObject("username_entry")
+	uo, err := Builder.GetObject("username_entry")
 	if err != nil {
 		panic(err)
 	}
@@ -114,7 +118,7 @@ func (lw *LoginWindow) SetUsername(username string) {
 }
 
 func (lw *LoginWindow) GetUserData() {
-	uo, err := lw.Builder.GetObject("username_entry")
+	uo, err := Builder.GetObject("username_entry")
 	if err != nil {
 		panic(err)
 	}
@@ -123,7 +127,7 @@ func (lw *LoginWindow) GetUserData() {
 		Username, _ = ue.GetText()
 	}
 
-	po, err := lw.Builder.GetObject("password_entry")
+	po, err := Builder.GetObject("password_entry")
 	if err != nil {
 		panic(err)
 	}
@@ -135,7 +139,7 @@ func (lw *LoginWindow) GetUserData() {
 }
 
 func (lw *LoginWindow) SetError(e error) {
-	eo, err := lw.Builder.GetObject("error_label")
+	eo, err := Builder.GetObject("error_label")
 	if err != nil {
 		panic(err)
 	}
@@ -143,5 +147,50 @@ func (lw *LoginWindow) SetError(e error) {
 	if el, ok := eo.(*gtk.Label); ok {
 		el.SetText(e.Error())
 	}
+
+}
+
+func NewPostWindow() {
+	obj, err := Builder.GetObject("post_window")
+	if err != nil {
+		panic(err)
+	}
+
+	if pw, ok := obj.(*gtk.Window); ok {
+		pw.ShowAll()
+		pbo, err := Builder.GetObject("post_button")
+		if err != nil {
+			panic(err)
+		}
+
+		if pb, ok := pbo.(*gtk.Button); ok {
+			pb.Connect("clicked", func(o glib.IObject) {
+				tbo, err := Builder.GetObject("post_buffer")
+				if err != nil {
+					panic(err)
+				}
+
+				if tb, ok := tbo.(*gtk.TextBuffer); ok {
+					s, e := tb.GetBounds()
+					text, err := tb.GetText(s, e, false)
+					if err != nil {
+						panic(err)
+					}
+					fmt.Println(text)
+					d, err := Client.PostDone(text)
+					fmt.Println("Done response", e)
+					fmt.Println(d.Id)
+				}
+				pw.Destroy()
+			})
+		}
+
+	} else {
+		panic("could not get post_window")
+	}
+
+}
+
+func PrefWindow() {
 
 }

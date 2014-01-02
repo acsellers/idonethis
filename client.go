@@ -80,7 +80,14 @@ func NewClient(username, password string) (*Client, error) {
 		rt := regexp.MustCompile("/cal/(.*)/\\\" title")
 		results = rt.FindSubmatch(secondPage)
 		if len(results) >= 2 {
-			c.TeamName = string(results[1])
+			fmt.Println(results)
+			if string(results[1]) != "setup/team" {
+				c.TeamName = string(results[1])
+			} else {
+				return nil, fmt.Errorf("Could not login")
+			}
+		} else {
+			return nil, fmt.Errorf("Could not login")
 		}
 	}
 
@@ -141,6 +148,7 @@ func (c *Client) FilteredDones(df DoneFilter) ([]Done, error) {
 	var d []Done
 	err = json.Unmarshal(body, &d)
 	if err != nil {
+		fmt.Println(string(body))
 		return []Done{}, err
 	}
 

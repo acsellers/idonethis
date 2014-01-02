@@ -13,11 +13,14 @@ import (
 var (
 	PasswordNotFound = fmt.Errorf("No password stored")
 	ErrorLog         *log.Logger
+	CheckInterval    <-chan time.Time
+	CheckMinutes     = 5
 )
 
 var (
 	Username, Password string
 	SeenDones          map[int]bool
+	Client             *idonethis.Client
 )
 
 func init() {
@@ -30,31 +33,34 @@ func main() {
 		GetLoginInfo()
 	}
 
-	fmt.Println(Username)
-	fmt.Println(Password)
-
-	c, e := idonethis.NewClient(Username, Password)
+	var e error
+	Client, e = idonethis.NewClient(Username, Password)
 	for e != nil {
 		fmt.Println("Could not authenticate, asking for new user/pass")
 		GetLoginInfoWithError(e)
-		c, e = idonethis.NewClient(Username, Password)
+		Client, e = idonethis.NewClient(Username, Password)
 	}
 
-	SetUsername(Username)
+	SaveSimple()
 	SetPassword(Username, Password)
 
-	CheckForDones(c)
+	StartIndicator()
+	fmt.Println("checking for dones")
+	CheckForDones()
 
 	fmt.Println("starting to tick")
-	t := time.Tick(5 * time.Minute)
-	for _ = range t {
-		CheckForDones(c)
+	if CheckInterval == nil {
+		CheckInterval = time.Tick(time.Duration(CheckMinutes) * time.Minute)
+	}
+	for _ = range CheckInterval {
+		fmt.Println("checking for new dones")
+		CheckForDones()
 	}
 }
 
-func CheckForDones(c *idonethis.Client) {
+func CheckForDones() {
 	f := idonethis.DoneFilter{Start: time.Now(), End: time.Now()}
-	dones, e := c.FilteredDones(f)
+	dones, e := Client.FilteredDones(f)
 	if e != nil {
 		fmt.Println(e)
 		os.Exit(0)
@@ -68,7 +74,7 @@ func CheckForDones(c *idonethis.Client) {
 	}
 }
 func GetLoginInfo() {
-	Username = GetUsername()
+	GetSimple()
 	if Username == "" {
 		GetInfoFromLoginWindow()
 		return

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"io/ioutil"
+	"encoding/gob"
+	"os"
 	"path/filepath"
 
 	"github.com/acsellers/keyring"
@@ -22,15 +23,45 @@ func SetPassword(username, password string) error {
 	return keyring.Set("idonethis_notify", username, password)
 }
 
-func GetUsername() string {
-	fb, e := ioutil.ReadFile(filepath.Join(basedir.ConfigHome, "idonethis"))
-	if e != nil {
-		return ""
-	}
-
-	return string(fb)
+type saveData struct {
+	Username string
+	CheckMin int
 }
 
-func SetUsername(username string) {
-	ioutil.WriteFile(filepath.Join(basedir.ConfigHome, "idonethis"), []byte(username), 0700)
+func GetSimple() {
+	f, e := os.Open(filepath.Join(basedir.ConfigHome, "idonethis"))
+	if e != nil {
+		return
+	}
+	defer f.Close()
+
+	d := gob.NewDecoder(f)
+	var sd saveData
+	e = d.Decode(&sd)
+	if e != nil {
+		return
+	}
+
+	Username = sd.Username
+	CheckMinutes = sd.CheckMin
+
+}
+
+func SaveSimple() {
+	f, e := os.Create(filepath.Join(basedir.ConfigHome, "idonethis"))
+	if e != nil {
+		return
+	}
+	defer f.Close()
+
+	enc := gob.NewEncoder(f)
+	sd := saveData{
+		Username: Username,
+		CheckMin: CheckMinutes,
+	}
+
+	e = enc.Encode(sd)
+	if e != nil {
+		return
+	}
 }
