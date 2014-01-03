@@ -13,22 +13,21 @@ import (
 var Indicator *appindicator.AppIndicator
 
 func StartIndicator() {
-	items := []string{"new_item", "pref_item", "quit_item"}
-	handlers := []ItemHandler{NewHandler, PrefHandler, QuitHandler}
+	items := []string{"New Done", "Preferences", "", "Quit"}
+	handlers := []ItemHandler{NewHandler, PrefHandler, nil, QuitHandler}
+	m, _ := gtk.MenuNew()
 
 	for i, _ := range items {
-		io, err := Builder.GetObject(items[i])
-		if err != nil {
-			fmt.Println("error", items[i])
-			continue
-		}
-		if ii, ok := io.(*gtk.MenuItem); ok {
-			fmt.Println(items[i])
-			ii.Connect("activate", handlers[i])
+		if items[i] != "" {
+			mi, _ := gtk.MenuItemNewWithLabel(items[i])
+			mi.Connect("activate", handlers[i])
+			m.Append(mi)
 		} else {
-			fmt.Println("Not widget:", items[i])
+			si, _ := gtk.SeparatorMenuItemNew()
+			m.Append(si)
 		}
 	}
+	m.ShowAll()
 
 	Indicator = appindicator.NewAppIndicatorWithPath(
 		"idonethis",
@@ -40,16 +39,9 @@ func StartIndicator() {
 	Indicator.SetStatus(appindicator.StatusActive)
 	Indicator.SetTitle("iDoneThis")
 
-	mo, e := Builder.GetObject("menu")
-	if e != nil {
-		panic(e)
-	}
-	if m, ok := mo.(*gtk.Menu); ok {
-		fmt.Println("setting menu")
-		Indicator.C_SetMenu(unsafe.Pointer(m.Native()))
-	} else {
-		fmt.Println("Menu not available")
-	}
+	fmt.Println("setting menu")
+	Indicator.C_SetMenu(unsafe.Pointer(m.Native()))
+
 	go gtk.Main()
 }
 

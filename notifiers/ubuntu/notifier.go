@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/acsellers/idonethis"
-	"github.com/conformal/gotk3/gtk"
+	"github.com/acsellers/idonethis/notifiers/ubuntu/windows"
 )
 
 var (
@@ -46,7 +46,7 @@ func main() {
 
 	StartIndicator()
 	fmt.Println("checking for dones")
-	CheckForDones()
+	CheckForPreviousDones()
 
 	fmt.Println("starting to tick")
 	if CheckInterval == nil {
@@ -73,6 +73,21 @@ func CheckForDones() {
 		}
 	}
 }
+
+func CheckForPreviousDones() {
+	f := idonethis.DoneFilter{Start: time.Now(), End: time.Now()}
+	dones, e := Client.FilteredDones(f)
+	if e != nil {
+		fmt.Println(e)
+		os.Exit(0)
+	}
+
+	for _, done := range dones {
+		if _, ok := SeenDones[done.Id]; !ok {
+			SeenDones[done.Id] = true
+		}
+	}
+}
 func GetLoginInfo() {
 	GetSimple()
 	if Username == "" {
@@ -87,59 +102,42 @@ func GetLoginInfo() {
 	}
 }
 
+func NewPostWindow() {
+	text := windows.PostWindow()
+	if text == "" {
+		return
+	}
+
+	fmt.Println(text)
+	d, err := Client.PostDone(text)
+	if err != nil {
+		return
+	}
+	fmt.Println(d.Id)
+}
+
 func GetInfoFromLoginWindow() {
-	lw := NewLoginWindow()
-	lw.SetUsername(Username)
-	go func() {
-		gtk.Main()
-	}()
-
-	select {
-	case <-lw.CancelBtn:
-		close(lw.LoginBtn)
-		close(lw.CancelBtn)
-		lw.LoginBtn = nil
-		lw.CancelBtn = nil
-
-		lw.Window.Destroy()
-		fmt.Println("Closing because Login was Cancelled")
+	Username, Password = windows.LoginWindow(Username, nil)
+	if Username == "" {
+		fmt.Println("User did not wish to login, terminating")
 		os.Exit(0)
-	case <-lw.LoginBtn:
-		close(lw.LoginBtn)
-		close(lw.CancelBtn)
-		lw.LoginBtn = nil
-		lw.CancelBtn = nil
-
-		lw.GetUserData()
-		lw.Window.Destroy()
 	}
 }
 
 func GetLoginInfoWithError(e error) {
-	lw := NewLoginWindow()
-	lw.SetUsername(Username)
-	lw.SetError(e)
-	go func() {
-		gtk.Main()
-	}()
-
-	select {
-	case <-lw.CancelBtn:
-		close(lw.LoginBtn)
-		close(lw.CancelBtn)
-		lw.LoginBtn = nil
-		lw.CancelBtn = nil
-
-		lw.Window.Destroy()
-		fmt.Println("Closing because Login was Cancelled")
+	Username, Password = windows.LoginWindow(Username, e)
+	if Username == "" {
+		fmt.Println("User did not wish to login, terminating")
 		os.Exit(0)
-	case <-lw.LoginBtn:
-		close(lw.LoginBtn)
-		close(lw.CancelBtn)
-		lw.LoginBtn = nil
-		lw.CancelBtn = nil
+	}
+}
 
-		lw.GetUserData()
-		lw.Window.Destroy()
+func PrefWindow() {
+	r := windows.PrefWindow(CheckMinutes, Username)
+	CheckMinutes = r.CheckInterval
+	CheckInterval = time.Tick(time.Duration(CheckMinutes) * time.Minute)
+
+	if r.WipeUserData {
+		SetPassword(Username, "")
 	}
 }
